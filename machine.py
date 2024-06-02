@@ -1,50 +1,67 @@
-from DataPath import DataPath, Registers_Memory_ALU_or_Flags_MUX, RegisterEnum, ALU_Operation, ALU_or_flags_MUX
+from DataPath import (
+    DataPath,
+    Registers_Memory_ALU_or_Flags_MUX,
+    RegisterEnum,
+    ALU_Operation,
+)
 from enum import Enum
 from sys import argv
-import pandas as pd
+import logging
+
+
 class Opcode(Enum):
-    NOP=0 # Заглушка
-    MOV=1 # Скопировать содержимое регистра в другой
-    LDR=2 # Загрузить в регистр содержимое памяти
-    STR=3 # Сохранить в память содержимое регистра
-    PUSH=4
-    POP=5
-    B=6 # Переход на метку (относительно регистра PC)
-    BL=7 # Переход метку с ссылкой
-    BX=8 # Переход на адрес из регистра
-    BLX=9 # Переход на адрес из регистра с ссылкой
-    AND=10
-    OR=11
-    NOT=12
-    NEG=13
-    ADD=14
-    SUB=15
-    MUL=16
-    DIV=17
-    LS=18 # Сдвиг влево
-    RS=19 # Сдвиг вправо
-    HALT=20 # Останов
-    INT=21 # Вызвать прерывание
-    CMP=22
-    ExINT=23 # Выйти из прерывания
+    NOP = 0  # Заглушка
+    MOV = 1  # Скопировать содержимое регистра в другой
+    LDR = 2  # Загрузить в регистр содержимое памяти
+    STR = 3  # Сохранить в память содержимое регистра
+    PUSH = 4
+    POP = 5
+    B = 6  # Переход на метку (относительно регистра PC)
+    BL = 7  # Переход метку с ссылкой
+    BX = 8  # Переход на адрес из регистра
+    BLX = 9  # Переход на адрес из регистра с ссылкой
+    AND = 10
+    OR = 11
+    NOT = 12
+    NEG = 13
+    ADD = 14
+    SUB = 15
+    MUL = 16
+    DIV = 17
+    LS = 18  # Сдвиг влево
+    RS = 19  # Сдвиг вправо
+    HALT = 20  # Останов
+    INT = 21  # Вызвать прерывание
+    CMP = 22
+    ExINT = 23  # Выйти из прерывания
+
+
 class AddressType(Enum):
     RELATIVE_PC = 0
     REGISTER = 1
     ABSOLUTE = 2
+
+
 class Register_or_Immediate(Enum):
-    IMMEDIATE=0
-    REGISTER=1
+    IMMEDIATE = 0
+    REGISTER = 1
+
+
 class ControlUnit:
     def __init__(self):
         self.datapath = DataPath()
         self._tick = 0
-        self._is_working=True
+        self._is_working = True
+
     def tick(self):
         self._tick += 1
+
     def instruction_fetch(self):
         # PC -> AR
         self.datapath.select_register(RegisterEnum.PC)
-        self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+        self.datapath.select_registers_memory_or_alu(
+            Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+        )
         self.datapath.set_ALU_operation(ALU_Operation.SUM)
         self.datapath.reset_plus_1()
         self.datapath.reset_use_carry()
@@ -53,13 +70,15 @@ class ControlUnit:
         self.datapath.set_first_ALU_input()
         self.datapath.set_use_first_ALU_input()
         self.datapath.reset_use_second_ALU_input()
-        self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+        self.datapath.select_registers_memory_or_alu(
+            Registers_Memory_ALU_or_Flags_MUX.ALU
+        )
         self.tick()
 
         self.datapath.set_AR()
         self.tick()
 
-        #PC+1 -> PC
+        # PC+1 -> PC
         self.datapath.set_plus_1()
         self.tick()
 
@@ -75,11 +94,13 @@ class ControlUnit:
         self.datapath.set_register()
         self.tick()
 
-        #[AR] -> DR
-        self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.MEMORY)
+        # [AR] -> DR
+        self.datapath.select_registers_memory_or_alu(
+            Registers_Memory_ALU_or_Flags_MUX.MEMORY
+        )
         self.tick()
 
-        #DR -> IR
+        # DR -> IR
         self.datapath.set_DR()
         self.datapath.reset_first_ALU_input()
         self.datapath.reset_plus_1()
@@ -92,35 +113,49 @@ class ControlUnit:
 
         self.datapath.set_register()
         self.tick()
+
     def get_opcode_from_IR(self):
-        return Opcode((self.datapath.get_IR()>>27)&0b11111)
+        return Opcode((self.datapath.get_IR() >> 27) & 0b11111)
+
     def get_conditions_from_IR(self):
-        flags = (self.datapath.get_IR()>>21)&0b111111
-        return ([(flags & 1<<i) > 0 for i in reversed(range(6))])
+        flags = (self.datapath.get_IR() >> 21) & 0b111111
+        return [(flags & 1 << i) > 0 for i in reversed(range(6))]
+
     def get_first_register_from_IR(self):
-        return RegisterEnum((self.datapath.get_IR()>>17)&0xf)
+        return RegisterEnum((self.datapath.get_IR() >> 17) & 0xF)
+
     def get_second_register_from_IR(self):
-        return RegisterEnum((self.datapath.get_IR()>>12)&0xf)
+        return RegisterEnum((self.datapath.get_IR() >> 12) & 0xF)
+
     def get_third_register_from_IR(self):
-        return RegisterEnum((self.datapath.get_IR()>>8)&0xf)
+        return RegisterEnum((self.datapath.get_IR() >> 8) & 0xF)
+
     def get_relative_type_from_IR(self):
-        return AddressType((self.datapath.get_IR()>>16)&1)
+        return AddressType((self.datapath.get_IR() >> 16) & 1)
+
     def conditions_check(self):
         conds = self.get_conditions_from_IR()
         flags = self.datapath.get_NZC()
-        return all([(not conds[2*i]) or (flags[i] == conds[2*i+1]) for i in range(3)])
+        return all(
+            [(not conds[2 * i]) or (flags[i] == conds[2 * i + 1]) for i in range(3)]
+        )
+
     def get_address_for_LDR_and_STR(self):
         match self.get_relative_type_from_IR():
             case AddressType.REGISTER:
                 self.datapath.select_register(self.get_second_register_from_IR())
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.tick()
 
                 self.datapath.set_AR()
                 self.tick()
             case AddressType.RELATIVE_PC:
                 self.datapath.select_register(RegisterEnum.IR)
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.tick()
 
                 self.datapath.set_DR()
@@ -136,7 +171,9 @@ class ControlUnit:
                 self.datapath.set_ALU_operation(ALU_Operation.CROP)
                 self.datapath.reset_plus_1()
                 self.datapath.set_use_second_ALU_input()
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.ALU
+                )
                 self.tick()
 
                 self.datapath.set_DR()
@@ -148,8 +185,11 @@ class ControlUnit:
 
                 self.datapath.set_AR()
                 self.tick()
+
     def branch(self):
-        self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+        self.datapath.select_registers_memory_or_alu(
+            Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+        )
         self.datapath.select_register(RegisterEnum.IR)
         self.tick()
 
@@ -157,13 +197,17 @@ class ControlUnit:
         self.datapath.set_ALU_operation(ALU_Operation.CROP)
         self.datapath.reset_use_first_ALU_input()
         self.datapath.set_use_second_ALU_input()
-        self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+        self.datapath.select_registers_memory_or_alu(
+            Registers_Memory_ALU_or_Flags_MUX.ALU
+        )
         self.tick()
 
         self.datapath.set_DR()
         self.tick()
 
-        self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+        self.datapath.select_registers_memory_or_alu(
+            Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+        )
         self.datapath.select_register(RegisterEnum.PC)
         self.tick()
 
@@ -174,11 +218,14 @@ class ControlUnit:
 
         self.datapath.set_register()
         self.tick()
+
     def save_link(self):
         self.datapath.reset_use_carry()
         self.datapath.reset_plus_1()
         self.datapath.select_register(RegisterEnum.PC)
-        self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+        self.datapath.select_registers_memory_or_alu(
+            Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+        )
         self.tick()
 
         self.datapath.reset_use_second_ALU_input()
@@ -192,10 +239,13 @@ class ControlUnit:
 
         self.datapath.set_register()
         self.tick()
+
     def branch_from_register(self):
         self.datapath.reset_use_carry()
         self.datapath.reset_plus_1()
-        self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+        self.datapath.select_registers_memory_or_alu(
+            Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+        )
         self.datapath.select_register(self.get_first_register_from_IR())
         self.tick()
 
@@ -207,22 +257,26 @@ class ControlUnit:
 
         self.datapath.select_register(RegisterEnum.PC)
         self.tick()
-        
+
         self.datapath.set_register()
         self.tick()
+
     def get_register_or_immediately_flag_from_IR(self):
-        return Register_or_Immediate((self.datapath.get_IR()>>16)&1)
+        return Register_or_Immediate((self.datapath.get_IR() >> 16) & 1)
+
     def execute_fetch(self):
         opcode = self.get_opcode_from_IR()
         match opcode:
             case Opcode.NOP:
-                pass
+                self.tick()
             case Opcode.MOV:
                 self.datapath.reset_DR()
                 self.datapath.select_register(self.get_second_register_from_IR())
                 self.datapath.reset_plus_1()
                 self.datapath.reset_use_carry()
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.tick()
 
                 self.datapath.set_first_ALU_input()
@@ -238,7 +292,9 @@ class ControlUnit:
                 self.tick()
             case Opcode.LDR:
                 self.get_address_for_LDR_and_STR()
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.MEMORY)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.MEMORY
+                )
                 self.tick()
 
                 self.datapath.set_DR()
@@ -257,7 +313,9 @@ class ControlUnit:
             case Opcode.STR:
                 self.get_address_for_LDR_and_STR()
                 self.datapath.select_register(self.get_first_register_from_IR())
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.tick()
 
                 self.datapath.set_first_ALU_input()
@@ -266,7 +324,9 @@ class ControlUnit:
                 self.datapath.set_use_first_ALU_input()
                 self.datapath.reset_use_second_ALU_input()
                 self.datapath.set_ALU_operation(ALU_Operation.SUM)
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.ALU
+                )
                 self.tick()
 
                 self.datapath.set_DR()
@@ -281,9 +341,11 @@ class ControlUnit:
                 self.datapath.reset_use_carry()
                 self.datapath.set_use_second_ALU_input()
                 self.datapath.reset_use_first_ALU_input()
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.ALU
+                )
                 self.tick()
-                
+
                 self.datapath.set_DR()
                 self.tick()
 
@@ -299,7 +361,9 @@ class ControlUnit:
                 self.datapath.set_DR()
                 self.tick()
 
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.datapath.select_register(RegisterEnum.SP)
                 self.datapath.reset_plus_1()
                 self.tick()
@@ -309,7 +373,9 @@ class ControlUnit:
                 self.datapath.set_ALU_operation(ALU_Operation.SUM)
                 self.tick()
 
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.ALU
+                )
                 self.tick()
 
                 self.datapath.set_register()
@@ -317,12 +383,16 @@ class ControlUnit:
                 self.tick()
 
                 self.datapath.select_register(self.get_first_register_from_IR())
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.tick()
 
                 self.datapath.set_first_ALU_input()
                 self.datapath.reset_use_second_ALU_input()
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.ALU
+                )
                 self.tick()
 
                 self.datapath.set_DR()
@@ -337,13 +407,9 @@ class ControlUnit:
                 self.datapath.reset_use_carry()
                 self.datapath.set_use_second_ALU_input()
                 self.datapath.reset_use_first_ALU_input()
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
-                self.tick()
-                
-                self.datapath.set_DR()
-                self.tick()
-
-                self.datapath.set_DR()
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.ALU
+                )
                 self.tick()
 
                 self.datapath.set_DR()
@@ -352,7 +418,15 @@ class ControlUnit:
                 self.datapath.set_DR()
                 self.tick()
 
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.set_DR()
+                self.tick()
+
+                self.datapath.set_DR()
+                self.tick()
+
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.datapath.select_register(RegisterEnum.SP)
                 self.datapath.reset_plus_1()
                 self.tick()
@@ -363,7 +437,9 @@ class ControlUnit:
                 self.datapath.reset_use_second_ALU_input()
                 self.tick()
 
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.ALU
+                )
                 self.tick()
 
                 self.datapath.set_AR()
@@ -378,7 +454,9 @@ class ControlUnit:
                 self.datapath.select_register(self.get_first_register_from_IR())
                 self.tick()
 
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.MEMORY)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.MEMORY
+                )
                 self.tick()
 
                 self.datapath.reset_use_first_ALU_input()
@@ -405,7 +483,9 @@ class ControlUnit:
             case Opcode.AND:
                 self.datapath.reset_use_carry()
                 self.datapath.reset_plus_1()
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.datapath.select_register(self.get_first_register_from_IR())
                 self.tick()
 
@@ -414,7 +494,9 @@ class ControlUnit:
                 self.tick()
                 match self.get_register_or_immediately_flag_from_IR():
                     case Register_or_Immediate.REGISTER:
-                        self.datapath.select_register(self.get_second_register_from_IR())
+                        self.datapath.select_register(
+                            self.get_second_register_from_IR()
+                        )
                         self.tick()
                     case Register_or_Immediate.IMMEDIATE:
                         self.datapath.select_register(RegisterEnum.IR)
@@ -425,11 +507,13 @@ class ControlUnit:
 
                         self.datapath.set_use_second_ALU_input()
                         self.datapath.set_ALU_operation(ALU_Operation.CROP)
-                        self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                        self.datapath.select_registers_memory_or_alu(
+                            Registers_Memory_ALU_or_Flags_MUX.ALU
+                        )
                         self.tick()
                 self.datapath.set_DR()
                 self.tick()
-                        
+
                 self.datapath.set_use_first_ALU_input()
                 self.datapath.set_use_second_ALU_input()
                 self.datapath.set_ALU_operation(ALU_Operation.AND)
@@ -445,7 +529,9 @@ class ControlUnit:
             case Opcode.OR:
                 self.datapath.reset_use_carry()
                 self.datapath.reset_plus_1()
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.datapath.select_register(self.get_first_register_from_IR())
                 self.tick()
 
@@ -454,7 +540,9 @@ class ControlUnit:
                 self.tick()
                 match self.get_register_or_immediately_flag_from_IR():
                     case Register_or_Immediate.REGISTER:
-                        self.datapath.select_register(self.get_second_register_from_IR())
+                        self.datapath.select_register(
+                            self.get_second_register_from_IR()
+                        )
                         self.tick()
                     case Register_or_Immediate.IMMEDIATE:
                         self.datapath.select_register(RegisterEnum.IR)
@@ -465,11 +553,13 @@ class ControlUnit:
 
                         self.datapath.set_use_second_ALU_input()
                         self.datapath.set_ALU_operation(ALU_Operation.CROP)
-                        self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                        self.datapath.select_registers_memory_or_alu(
+                            Registers_Memory_ALU_or_Flags_MUX.ALU
+                        )
                         self.tick()
                 self.datapath.set_DR()
                 self.tick()
-                        
+
                 self.datapath.set_use_first_ALU_input()
                 self.datapath.set_use_second_ALU_input()
                 self.datapath.set_ALU_operation(ALU_Operation.OR)
@@ -483,7 +573,9 @@ class ControlUnit:
                 self.datapath.set_NZC()
                 self.tick()
             case Opcode.NOT:
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.datapath.select_register(self.get_first_register_from_IR())
                 self.tick()
 
@@ -500,7 +592,9 @@ class ControlUnit:
                 self.datapath.set_NZC()
                 self.tick()
             case Opcode.NEG:
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.datapath.select_register(self.get_first_register_from_IR())
                 self.tick()
 
@@ -521,7 +615,9 @@ class ControlUnit:
             case Opcode.ADD:
                 self.datapath.reset_use_carry()
                 self.datapath.reset_plus_1()
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.datapath.select_register(self.get_first_register_from_IR())
                 self.tick()
 
@@ -530,7 +626,9 @@ class ControlUnit:
                 self.tick()
                 match self.get_register_or_immediately_flag_from_IR():
                     case Register_or_Immediate.REGISTER:
-                        self.datapath.select_register(self.get_second_register_from_IR())
+                        self.datapath.select_register(
+                            self.get_second_register_from_IR()
+                        )
                         self.tick()
                     case Register_or_Immediate.IMMEDIATE:
                         self.datapath.select_register(RegisterEnum.IR)
@@ -539,7 +637,9 @@ class ControlUnit:
                         self.datapath.set_DR()
                         self.datapath.set_use_second_ALU_input()
                         self.datapath.set_ALU_operation(ALU_Operation.CROP)
-                        self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                        self.datapath.select_registers_memory_or_alu(
+                            Registers_Memory_ALU_or_Flags_MUX.ALU
+                        )
                         self.tick()
                 self.datapath.set_DR()
                 self.tick()
@@ -559,7 +659,9 @@ class ControlUnit:
             case Opcode.SUB:
                 self.datapath.reset_use_carry()
                 self.datapath.reset_plus_1()
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.datapath.select_register(self.get_first_register_from_IR())
                 self.tick()
 
@@ -568,7 +670,9 @@ class ControlUnit:
                 self.tick()
                 match self.get_register_or_immediately_flag_from_IR():
                     case Register_or_Immediate.REGISTER:
-                        self.datapath.select_register(self.get_second_register_from_IR())
+                        self.datapath.select_register(
+                            self.get_second_register_from_IR()
+                        )
                         self.tick()
                     case Register_or_Immediate.IMMEDIATE:
                         self.datapath.select_register(RegisterEnum.IR)
@@ -577,13 +681,17 @@ class ControlUnit:
                         self.datapath.set_DR()
                         self.datapath.set_use_second_ALU_input()
                         self.datapath.set_ALU_operation(ALU_Operation.CROP)
-                        self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                        self.datapath.select_registers_memory_or_alu(
+                            Registers_Memory_ALU_or_Flags_MUX.ALU
+                        )
                         self.tick()
                 self.datapath.set_DR()
                 self.tick()
 
                 self.datapath.set_ALU_operation(ALU_Operation.NOT)
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.ALU
+                )
                 self.tick()
 
                 self.datapath.set_DR()
@@ -605,7 +713,9 @@ class ControlUnit:
             case Opcode.MUL:
                 self.datapath.reset_use_carry()
                 self.datapath.reset_plus_1()
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.datapath.select_register(self.get_first_register_from_IR())
                 self.tick()
 
@@ -614,7 +724,9 @@ class ControlUnit:
                 self.tick()
                 match self.get_register_or_immediately_flag_from_IR():
                     case Register_or_Immediate.REGISTER:
-                        self.datapath.select_register(self.get_second_register_from_IR())
+                        self.datapath.select_register(
+                            self.get_second_register_from_IR()
+                        )
                         self.tick()
                     case Register_or_Immediate.IMMEDIATE:
                         self.datapath.select_register(RegisterEnum.IR)
@@ -623,7 +735,9 @@ class ControlUnit:
                         self.datapath.set_DR()
                         self.datapath.set_use_second_ALU_input()
                         self.datapath.set_ALU_operation(ALU_Operation.CROP)
-                        self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                        self.datapath.select_registers_memory_or_alu(
+                            Registers_Memory_ALU_or_Flags_MUX.ALU
+                        )
                         self.tick()
                 self.datapath.set_DR()
                 self.tick()
@@ -643,7 +757,9 @@ class ControlUnit:
             case Opcode.DIV:
                 self.datapath.reset_use_carry()
                 self.datapath.reset_plus_1()
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.datapath.select_register(self.get_first_register_from_IR())
                 self.tick()
 
@@ -652,7 +768,9 @@ class ControlUnit:
                 self.tick()
                 match self.get_register_or_immediately_flag_from_IR():
                     case Register_or_Immediate.REGISTER:
-                        self.datapath.select_register(self.get_second_register_from_IR())
+                        self.datapath.select_register(
+                            self.get_second_register_from_IR()
+                        )
                         self.tick()
                     case Register_or_Immediate.IMMEDIATE:
                         self.datapath.select_register(RegisterEnum.IR)
@@ -661,7 +779,9 @@ class ControlUnit:
                         self.datapath.set_DR()
                         self.datapath.set_use_second_ALU_input()
                         self.datapath.set_ALU_operation(ALU_Operation.CROP)
-                        self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                        self.datapath.select_registers_memory_or_alu(
+                            Registers_Memory_ALU_or_Flags_MUX.ALU
+                        )
                         self.tick()
                 self.datapath.set_DR()
                 self.tick()
@@ -681,7 +801,9 @@ class ControlUnit:
             case Opcode.LS:
                 self.datapath.reset_use_carry()
                 self.datapath.reset_plus_1()
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.datapath.select_register(self.get_first_register_from_IR())
                 self.tick()
 
@@ -690,7 +812,9 @@ class ControlUnit:
                 self.tick()
                 match self.get_register_or_immediately_flag_from_IR():
                     case Register_or_Immediate.REGISTER:
-                        self.datapath.select_register(self.get_second_register_from_IR())
+                        self.datapath.select_register(
+                            self.get_second_register_from_IR()
+                        )
                         self.tick()
                     case Register_or_Immediate.IMMEDIATE:
                         self.datapath.select_register(RegisterEnum.IR)
@@ -699,7 +823,9 @@ class ControlUnit:
                         self.datapath.set_DR()
                         self.datapath.set_use_second_ALU_input()
                         self.datapath.set_ALU_operation(ALU_Operation.CROP)
-                        self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                        self.datapath.select_registers_memory_or_alu(
+                            Registers_Memory_ALU_or_Flags_MUX.ALU
+                        )
                         self.tick()
                 self.datapath.set_DR()
                 self.tick()
@@ -719,7 +845,9 @@ class ControlUnit:
             case Opcode.RS:
                 self.datapath.reset_use_carry()
                 self.datapath.reset_plus_1()
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.datapath.select_register(self.get_first_register_from_IR())
                 self.tick()
 
@@ -728,7 +856,9 @@ class ControlUnit:
                 self.tick()
                 match self.get_register_or_immediately_flag_from_IR():
                     case Register_or_Immediate.REGISTER:
-                        self.datapath.select_register(self.get_second_register_from_IR())
+                        self.datapath.select_register(
+                            self.get_second_register_from_IR()
+                        )
                         self.tick()
                     case Register_or_Immediate.IMMEDIATE:
                         self.datapath.select_register(RegisterEnum.IR)
@@ -737,7 +867,9 @@ class ControlUnit:
                         self.datapath.set_DR()
                         self.datapath.set_use_second_ALU_input()
                         self.datapath.set_ALU_operation(ALU_Operation.CROP)
-                        self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                        self.datapath.select_registers_memory_or_alu(
+                            Registers_Memory_ALU_or_Flags_MUX.ALU
+                        )
                         self.tick()
                 self.datapath.set_DR()
                 self.tick()
@@ -755,9 +887,12 @@ class ControlUnit:
                 self.datapath.set_NZC()
                 self.tick()
             case Opcode.HALT:
-                self._is_working=False
+                self._is_working = False
+                self.tick()
             case Opcode.INT:
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.datapath.select_register(RegisterEnum.IR)
                 self.tick()
 
@@ -767,7 +902,9 @@ class ControlUnit:
                 self.datapath.set_ALU_operation(ALU_Operation.CROP)
                 self.datapath.set_use_second_ALU_input()
                 self.datapath.reset_use_first_ALU_input()
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.ALU
+                )
                 self.tick()
 
                 self.datapath.set_DR()
@@ -791,14 +928,18 @@ class ControlUnit:
                 self.datapath.set_first_ALU_input()
                 self.tick()
 
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.datapath.select_register(RegisterEnum.INTR)
                 self.tick()
-                
+
                 self.datapath.set_DR()
                 self.tick()
 
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.ALU
+                )
                 self.datapath.set_ALU_operation(ALU_Operation.OR)
                 self.datapath.set_use_first_ALU_input()
                 self.tick()
@@ -808,7 +949,9 @@ class ControlUnit:
             case Opcode.CMP:
                 self.datapath.reset_use_carry()
                 self.datapath.reset_plus_1()
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.datapath.select_register(self.get_first_register_from_IR())
                 self.tick()
 
@@ -817,7 +960,9 @@ class ControlUnit:
                 self.tick()
                 match self.get_register_or_immediately_flag_from_IR():
                     case Register_or_Immediate.REGISTER:
-                        self.datapath.select_register(self.get_second_register_from_IR())
+                        self.datapath.select_register(
+                            self.get_second_register_from_IR()
+                        )
                         self.tick()
                     case Register_or_Immediate.IMMEDIATE:
                         self.datapath.select_register(RegisterEnum.IR)
@@ -826,13 +971,17 @@ class ControlUnit:
                         self.datapath.set_DR()
                         self.datapath.set_use_second_ALU_input()
                         self.datapath.set_ALU_operation(ALU_Operation.CROP)
-                        self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                        self.datapath.select_registers_memory_or_alu(
+                            Registers_Memory_ALU_or_Flags_MUX.ALU
+                        )
                         self.tick()
                 self.datapath.set_DR()
                 self.tick()
 
                 self.datapath.set_ALU_operation(ALU_Operation.NOT)
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.ALU
+                )
                 self.tick()
 
                 self.datapath.set_DR()
@@ -850,7 +999,9 @@ class ControlUnit:
                 self.datapath.set_NZC()
                 self.tick()
             case Opcode.ExINT:
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+                )
                 self.datapath.select_register(RegisterEnum.SP)
                 self.tick()
 
@@ -858,7 +1009,9 @@ class ControlUnit:
                 self.datapath.set_first_ALU_input()
                 self.tick()
 
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.MEMORY)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.MEMORY
+                )
                 self.tick()
 
                 self.datapath.set_DR()
@@ -881,7 +1034,9 @@ class ControlUnit:
                 self.datapath.reset_use_second_ALU_input()
                 self.datapath.set_plus_1()
                 self.datapath.set_ALU_operation(ALU_Operation.SUM)
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.ALU
+                )
                 self.tick()
 
                 self.datapath.set_first_ALU_input()
@@ -900,7 +1055,9 @@ class ControlUnit:
                 self.datapath.set_first_ALU_input()
                 self.tick()
 
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.MEMORY)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.MEMORY
+                )
                 self.tick()
 
                 self.datapath.set_DR()
@@ -913,7 +1070,9 @@ class ControlUnit:
                 self.datapath.set_register()
                 self.tick()
 
-                self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+                self.datapath.select_registers_memory_or_alu(
+                    Registers_Memory_ALU_or_Flags_MUX.ALU
+                )
                 self.datapath.set_plus_1()
                 self.datapath.set_use_first_ALU_input()
                 self.datapath.reset_use_second_ALU_input()
@@ -935,7 +1094,9 @@ class ControlUnit:
     def check_interruptions(self):
         if self.datapath.get_INTR() != 0 and not self.datapath.is_in_interruption:
             # SP -= 4
-            self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+            self.datapath.select_registers_memory_or_alu(
+                Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+            )
             self.datapath.select_register(RegisterEnum.SP)
             self.tick()
 
@@ -947,7 +1108,9 @@ class ControlUnit:
             self.datapath.set_use_second_ALU_input()
             self.datapath.reset_use_first_ALU_input()
             self.datapath.set_ALU_operation(ALU_Operation.SUM)
-            self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+            self.datapath.select_registers_memory_or_alu(
+                Registers_Memory_ALU_or_Flags_MUX.ALU
+            )
             self.tick()
 
             self.datapath.set_DR()
@@ -961,7 +1124,7 @@ class ControlUnit:
 
             self.datapath.set_DR()
             self.tick()
-            
+
             self.datapath.reset_plus_1()
             self.datapath.set_ALU_operation(ALU_Operation.SUB)
             self.datapath.set_use_first_ALU_input()
@@ -974,8 +1137,10 @@ class ControlUnit:
             self.datapath.set_first_ALU_input()
             self.tick()
 
-            #PC -> [SP]
-            self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+            # PC -> [SP]
+            self.datapath.select_registers_memory_or_alu(
+                Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+            )
             self.datapath.select_register(RegisterEnum.PC)
             self.tick()
 
@@ -985,10 +1150,12 @@ class ControlUnit:
             self.datapath.write_to_memory()
             self.tick()
 
-            #SP -= 4
+            # SP -= 4
 
             self.datapath.reset_DR()
-            self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+            self.datapath.select_registers_memory_or_alu(
+                Registers_Memory_ALU_or_Flags_MUX.ALU
+            )
             self.datapath.set_plus_1()
             self.datapath.reset_use_first_ALU_input()
             self.datapath.set_use_second_ALU_input()
@@ -1017,19 +1184,23 @@ class ControlUnit:
             self.datapath.set_register()
             self.tick()
 
-            #FLAGS -> [SP]
-            self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.FLAGS)
+            # FLAGS -> [SP]
+            self.datapath.select_registers_memory_or_alu(
+                Registers_Memory_ALU_or_Flags_MUX.FLAGS
+            )
             self.tick()
 
             self.datapath.set_DR()
             self.tick()
-            
+
             self.datapath.write_to_memory()
             self.tick()
 
-            #first bit of INTR -> FLAGS[INT_NUM]
+            # first bit of INTR -> FLAGS[INT_NUM]
 
-            self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+            self.datapath.select_registers_memory_or_alu(
+                Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+            )
             self.datapath.select_register(RegisterEnum.INTR)
             self.tick()
 
@@ -1040,14 +1211,16 @@ class ControlUnit:
             self.datapath.select_register(RegisterEnum.PC)
             self.tick()
 
-            self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+            self.datapath.select_registers_memory_or_alu(
+                Registers_Memory_ALU_or_Flags_MUX.ALU
+            )
             self.tick()
 
             self.datapath.set_first_ALU_input()
             self.datapath.set_interuption_num()
             self.tick()
 
-            #(first bit of INTR) + 1 -> PC
+            # (first bit of INTR) + 1 -> PC
 
             self.datapath.set_ALU_operation(ALU_Operation.SUM)
             self.datapath.set_plus_1()
@@ -1080,7 +1253,9 @@ class ControlUnit:
 
             # INTR &= ~(1<<INT_NUM)
 
-            self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+            self.datapath.select_registers_memory_or_alu(
+                Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+            )
             self.datapath.select_register(RegisterEnum.INTR)
             self.tick()
 
@@ -1088,7 +1263,9 @@ class ControlUnit:
             self.tick()
 
             self.datapath.set_ALU_operation(ALU_Operation.FIND_LOW_1)
-            self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+            self.datapath.select_registers_memory_or_alu(
+                Registers_Memory_ALU_or_Flags_MUX.ALU
+            )
             self.datapath.set_use_second_ALU_input()
             self.tick()
 
@@ -1120,9 +1297,11 @@ class ControlUnit:
             self.tick()
 
             self.datapath.select_register(RegisterEnum.INTR)
-            self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.REGISTERS)
+            self.datapath.select_registers_memory_or_alu(
+                Registers_Memory_ALU_or_Flags_MUX.REGISTERS
+            )
             self.tick()
-            
+
             self.datapath.set_DR()
             self.tick()
 
@@ -1131,10 +1310,12 @@ class ControlUnit:
 
             self.datapath.set_register()
             self.tick()
-            
-            #1 -> FLAGS[IS_IN_INT]
-            
-            self.datapath.select_registers_memory_or_alu(Registers_Memory_ALU_or_Flags_MUX.ALU)
+
+            # 1 -> FLAGS[IS_IN_INT]
+
+            self.datapath.select_registers_memory_or_alu(
+                Registers_Memory_ALU_or_Flags_MUX.ALU
+            )
             self.datapath.reset_use_first_ALU_input()
             self.datapath.reset_use_second_ALU_input()
             self.datapath.set_plus_1()
@@ -1161,41 +1342,66 @@ class ControlUnit:
 
             self.datapath.set_is_in_interruption()
             self.tick()
-            
+
     def execute_one_instruction(self):
         self.instruction_fetch()
-        if(self.conditions_check()):
+        if self.conditions_check():
             self.execute_fetch()
         self.check_interruptions()
 
     def interrupt(self, int_num):
         self.datapath.add_interruption(int_num)
-if __name__ == '__main__':
+
+    def simulate(self, input_data):
+        self.datapath.registers[RegisterEnum.SP.value] = 0x1000 - 4
+        self.datapath.registers[RegisterEnum.PC.value] = 0
+        self.datapath.set_memory_mapped_register(1, -1)
+        logging.debug(
+            "%s",
+            str(
+                [f"R{i}" for i in range(11)]
+                + ["LR", "SP", "PC", "INTR", "IR", "N", "Z", "C"]
+            ),
+        )
+        while self._is_working:
+            self.execute_one_instruction()
+            if self.datapath.get_memory_mapped_register(0) != 0:
+                print(chr(self.datapath.get_memory_mapped_register(0)), end="")
+                self.datapath.set_memory_mapped_register(0, 0)
+            if self.datapath.get_memory_mapped_register(1) == 0xFFFFFFFF:
+                if len(input_data) != 0:
+                    self.datapath.set_memory_mapped_register(1, ord(input_data[0]))
+                    input_data = input_data[1:]
+                    self.datapath.add_interruption(0)
+            logging.debug(
+                "%s",
+                str(
+                    [hex(i) for i in self.datapath.registers] + self.datapath.get_NZC()
+                ),
+            )
+        print("Выполнено тактов:", self._tick)
+
+
+def main(target, input_stream):
     c = ControlUnit()
     c.datapath.mem_size = 0x1000
     c.datapath.memory = [0 for i in range(c.datapath.mem_size)]
-    with open(argv[1], 'rb') as f:
+    with open(target, "rb") as f:
         programm = f.read()
-        programm = [int.from_bytes(programm[i:i+1], byteorder='big') for i in range(len(programm))]
-        c.datapath.memory[:len(programm)] = programm
-    input_data = '\0'
-    if len (argv) == 4:
-        with open(argv[3], 'r') as f:
-            input_data = f.read() + '\0'
-    c.datapath.registers[RegisterEnum.SP.value]=0x1000-4
-    c.datapath.registers[RegisterEnum.PC.value] = 0
-    c.datapath.set_memory_mapped_register(1, -1)
-    journal = pd.DataFrame(columns = [f'R{i}' for i in range(11)]+['LR','SP','PC','INTR','IR','N','Z','C'])
-    while c._is_working:
-        c.execute_one_instruction()
-        if c.datapath.get_memory_mapped_register(0) != 0:
-            print(chr(c.datapath.get_memory_mapped_register(0)), end='')
-            c.datapath.set_memory_mapped_register(0,0)
-        if c.datapath.get_memory_mapped_register(1) == 0xffffffff:
-            if len(input_data) != 0:
-                c.datapath.set_memory_mapped_register(1, ord(input_data[0]))
-                input_data=input_data[1:]
-                c.datapath.add_interruption(0)
-        journal.loc[len(journal)] = [hex(i) for i in c.datapath.registers] + c.datapath.get_NZC()
-    journal.to_csv(argv[2])
-    print('Выполнено тактов:',c._tick)
+        programm = [
+            int.from_bytes(programm[i : i + 1], byteorder="big")
+            for i in range(len(programm))
+        ]
+        c.datapath.memory[: len(programm)] = programm
+    with open(input_stream) as f:
+        input_data = f.read() + "\0"
+    c.simulate(input_data)
+
+
+if __name__ == "__main__":
+    if len(argv) == 3:
+        main(argv[1], argv[2])
+    else:
+        print(
+            "Неверный ввод! python machine.py <Имя исполняемого файла> <Имя файла с входными данными>"
+        )

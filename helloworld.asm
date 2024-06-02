@@ -25,7 +25,6 @@ print:
     bxz lr
     ldr r2, [=out_reg]
     ldr r3, [r0]
-    cmp r3, 0
     str r3, [r2]
     sub r1, 1
     add r0, 4
