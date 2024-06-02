@@ -166,7 +166,7 @@ class Translator:
         with open(fname) as f:
             for num_line, line in enumerate(f):
                 line = line.strip()
-                found = re.search("^(?:([^\s]+):)?\s*(?:(\w+)(?:\s+(.+))?)?$", line)
+                found = re.search(r"^(?:([^\s]+):)?\s*(?:(\w+)(?:\s+(.+))?)?$", line)
                 if found:
                     label = found.group(1)
                     if label:
