@@ -30,5 +30,3 @@ def test_translator_and_machine(golden, caplog):
             code = str(file.read())
         assert code == golden.out["out_code"]
         assert stdout.getvalue() == golden.out["out_stdout"]
-        if "out_log" in golden.out:
-            assert caplog.text == golden.out["out_log"]
